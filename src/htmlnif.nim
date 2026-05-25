@@ -141,18 +141,6 @@ const
 template tagId*(t: HtmlTag): TagId   = TagId(uint32(t) + 1'u32)
 template htmlTag*(t: TagId): HtmlTag = cast[HtmlTag](uint32(t) - 1'u32)
 
-# ── tag pool setup ───────────────────────────────────────────────────────
-
-proc createHtmlTagPool*(): TagPool =
-  ## Register every HtmlTag in ordinal order. BiTable hands out ids
-  ## 1, 2, 3, …, so `TagUnknown` (ordinal 0) lands at TagId(1) and the
-  ## boundary shims do the +/- 1.
-  result = newTagPool()
-  for t in HtmlTag.low..HtmlTag.high:
-    let id = result.registerTag($t)
-    assert id.uint32 == t.uint32 + 1,
-      "HtmlTag/TagId misalignment for " & $t & ": got id " & $id
-
 # ── construction ─────────────────────────────────────────────────────────
 
 type
@@ -162,7 +150,7 @@ type
 proc `=copy`(dest: var HtmlDoc; src: HtmlDoc) {.error.}
 
 proc createHtmlDoc*(sharedPool: Pool = nil): HtmlDoc =
-  result.buf = createTokenBuf(16, sharedPool, createHtmlTagPool())
+  result.buf = createTokenBuf(16, sharedPool, createTags[HtmlTag]())
 
 # ── Builder ──────────────────────────────────────────────────────────────
 
@@ -267,7 +255,7 @@ when isMainModule:
       quit 1
 
   block tag_ordinals_align:
-    let tp = createHtmlTagPool()
+    let tp = createTags[HtmlTag]()
     # Spot-check that the cast trip works both ways for a few tags.
     check tp.registerTag("div"), TagDiv.tagId
     check tp.registerTag("br"),  TagBr.tagId

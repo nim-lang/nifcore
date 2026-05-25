@@ -198,6 +198,21 @@ proc registerTag*(tp: TagPool; tag: string): TagId =
   ## startup so the returned TagId equals the enum ordinal (1-based).
   tp.tags.getOrIncl(tag)
 
+proc createTags*[E: enum](): TagPool =
+  ## One-shot tag-pool builder for an adapter's enum. Registers every
+  ## value of `E` in ordinal order using its string form (`$e`), so the
+  ## resulting TagIds are `1, 2, …` matching the `tagId` / `myKind`
+  ## `+/- 1` shim. Replaces hand-rolled `createJsonTagPool` /
+  ## `createHtmlTagPool` boilerplate.
+  ##
+  ## The assertion guards against an enum with holes or out-of-order
+  ## ordinals — those would silently break the `cast[E](tagId-1)` path.
+  result = newTagPool()
+  for e in E.low..E.high:
+    let id = result.registerTag($e)
+    assert id.uint32 == e.uint32 + 1'u32,
+      "createTags: enum/TagId misalignment for " & $e & " (got id " & $id & ")"
+
 template tagName*(tp: TagPool; t: TagId): lent string = tp.tags[t]
 # Direct pool lookups (only meaningful for pool-mode payloads — inline
 # strings/syms don't have ids). Prefer the cursor-side `strVal(c)` /

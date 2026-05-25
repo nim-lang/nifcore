@@ -48,18 +48,6 @@ type
 
 proc `=copy`(dest: var JsonTree; src: JsonTree) {.error.}
 
-# ── tag pool setup ───────────────────────────────────────────────────────
-
-proc createJsonTagPool*(): TagPool =
-  ## Register the full `JsonKind` enum in ordinal order into a fresh
-  ## TagPool. BiTable hands out ids 1, 2, 3, …, so JKNull (ordinal 0)
-  ## becomes TagId(1), JKTrue (ordinal 1) becomes TagId(2), etc.
-  result = newTagPool()
-  for k in JKNull..JKKv:
-    let id = result.registerTag($k)
-    assert id.uint32 == k.uint32 + 1,
-      "JsonKind/TagId misalignment for " & $k & ": got id " & $id
-
 # Boundary shims. The +/-1 collapses to a single add/sub instruction;
 # both are still register-only — no memory, no branch.
 template tagId*(k: JsonKind): TagId   = TagId(uint32(k) + 1'u32)
@@ -68,7 +56,7 @@ template jsonKind*(t: TagId): JsonKind = cast[JsonKind](uint32(t) - 1'u32)
 # ── construction ─────────────────────────────────────────────────────────
 
 proc createJsonTree*(sharedPool: Pool = nil): JsonTree =
-  result.buf = createTokenBuf(16, sharedPool, createJsonTagPool())
+  result.buf = createTokenBuf(16, sharedPool, createTags[JsonKind]())
 
 # ── parser ───────────────────────────────────────────────────────────────
 
@@ -291,7 +279,7 @@ when isMainModule:
       quit 1
 
   block tag_ordinals_align:
-    let tp = createJsonTagPool()
+    let tp = createTags[JsonKind]()
     # JKNull at ordinal 0; BiTable hands out ids 1, 2, …, so `tagId`
     # adds 1 and `jsonKind` subtracts 1 at the boundary.
     check tp.registerTag("null"),    JKNull.tagId
